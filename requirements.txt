@@ -1,0 +1,9 @@
+# Install the core stack in this order before using this file:
+# pip install git+https://github.com/rkazants/optimum-intel.git@support_gemma_4
+# pip install --pre -U openvino openvino-tokenizers nncf --extra-index-url https://storage.openvinotoolkit.org/simple/wheels/nightly
+# pip install transformers==5.5.0
+
+git+https://github.com/rkazants/optimum-intel.git@support_gemma_4
+torchvision
+Pillow
+requests
