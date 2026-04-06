@@ -1,40 +1,29 @@
 """
-Gemma 4 E4B OpenVINO demo.
+Gemma 4 E4B OpenVINO inference demo.
 
-Reference:
-https://github.com/openvinotoolkit/openvino_notebooks/blob/latest/notebooks/gemma4/gemma4.ipynb
+Before running this script, export the model with:
+optimum-cli export openvino --model google/gemma-4-E4B-it --task image-text-to-text --trust-remote-code --weight-format int8 gemma-4-E4B-it_ov_int8
 """
 
 from __future__ import annotations
 
 import argparse
-import importlib.util
-import subprocess
-import sys
 from io import BytesIO
 from pathlib import Path
 
-DEFAULT_MODEL_ID = "google/gemma-4-E4B-it"
-DEFAULT_WEIGHT_FORMAT = "int8"
-DEFAULT_EXPORT_ROOT = Path("models")
+DEFAULT_MODEL_DIR = Path("gemma-4-E4B-it_ov_int8")
 DEFAULT_DEVICE = "AUTO"
-
-
-def has_module(module_name: str) -> bool:
-    try:
-        return importlib.util.find_spec(module_name) is not None
-    except ModuleNotFoundError:
-        return False
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run google/gemma-4-E4B-it inference with OpenVINO."
+        description="Run inference with a pre-exported google/gemma-4-E4B-it OpenVINO model."
     )
     parser.add_argument(
-        "--model-id",
-        default=DEFAULT_MODEL_ID,
-        help=f"Hugging Face model id. Default: {DEFAULT_MODEL_ID}",
+        "--model-dir",
+        type=Path,
+        default=DEFAULT_MODEL_DIR,
+        help=f"Directory containing the exported OpenVINO model. Default: {DEFAULT_MODEL_DIR}",
     )
     parser.add_argument(
         "--prompt",
@@ -56,17 +45,6 @@ def parse_args() -> argparse.Namespace:
         help=f"OpenVINO device name. Default: {DEFAULT_DEVICE}",
     )
     parser.add_argument(
-        "--weight-format",
-        choices=("fp16", "int8", "int4"),
-        default=DEFAULT_WEIGHT_FORMAT,
-        help=f"Weight format used during export. Default: {DEFAULT_WEIGHT_FORMAT}",
-    )
-    parser.add_argument(
-        "--export-dir",
-        type=Path,
-        help="Directory containing the exported OpenVINO model.",
-    )
-    parser.add_argument(
         "--max-new-tokens",
         type=int,
         default=256,
@@ -77,57 +55,19 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Enable Gemma 4 thinking mode.",
     )
-    parser.add_argument(
-        "--force-export",
-        action="store_true",
-        help="Re-export the model even if the OpenVINO files already exist.",
-    )
     return parser.parse_args()
 
 
-def resolve_export_dir(args: argparse.Namespace) -> Path:
-    if args.export_dir is not None:
-        return args.export_dir
+def ensure_model_dir(model_dir: Path) -> None:
+    if model_dir.exists() and any(model_dir.glob("*.xml")):
+        return
 
-    model_name = args.model_id.split("/")[-1]
-    return DEFAULT_EXPORT_ROOT / model_name / args.weight_format.upper()
-
-
-def has_exported_model(export_dir: Path) -> bool:
-    return export_dir.exists() and any(export_dir.glob("*.xml"))
-
-
-def run_export(model_id: str, export_dir: Path, weight_format: str) -> None:
-    export_dir.parent.mkdir(parents=True, exist_ok=True)
-    export_args = [
-        "export",
-        "openvino",
-        "--model",
-        model_id,
-        "--task",
-        "image-text-to-text",
-        "--weight-format",
-        weight_format,
-        str(export_dir),
-    ]
-
-    command = None
-    if has_module("optimum.commands.optimum_cli"):
-        command = [sys.executable, "-m", "optimum.commands.optimum_cli", *export_args]
-    elif has_module("optimum"):
-        command = [sys.executable, "-m", "optimum.commands.optimum_cli", *export_args]
-    else:
-        command = ["optimum-cli", *export_args]
-
-    try:
-        subprocess.run(command, check=True)
-    except FileNotFoundError as exc:
-        raise SystemExit(
-            "optimum export CLI が見つかりません。gemma4_demo.py を実行している Python 環境に "
-            "optimum-intel をインストールしてください。"
-        ) from exc
-    except subprocess.CalledProcessError as exc:
-        raise SystemExit(f"OpenVINO export failed with exit code {exc.returncode}.") from exc
+    raise SystemExit(
+        "OpenVINO model files were not found. Export the model first:\n"
+        "optimum-cli export openvino --model google/gemma-4-E4B-it "
+        "--task image-text-to-text --trust-remote-code --weight-format int8 "
+        "gemma-4-E4B-it_ov_int8"
+    )
 
 
 def load_image(path_or_url: str):
@@ -167,17 +107,17 @@ def build_messages(args: argparse.Namespace) -> list[dict]:
     return messages
 
 
-def generate_text(args: argparse.Namespace, export_dir: Path) -> str:
+def generate_text(args: argparse.Namespace) -> str:
     from optimum.intel.openvino import OVModelForVisualCausalLM
     from transformers import AutoProcessor
 
-    messages = build_messages(args)
-    processor = AutoProcessor.from_pretrained(export_dir, trust_remote_code=True)
+    processor = AutoProcessor.from_pretrained(args.model_dir, trust_remote_code=True)
     model = OVModelForVisualCausalLM.from_pretrained(
-        export_dir,
+        args.model_dir,
         device=args.device,
         trust_remote_code=True,
     )
+    messages = build_messages(args)
 
     if args.image:
         inputs = processor.apply_chat_template(
@@ -212,18 +152,12 @@ def generate_text(args: argparse.Namespace, export_dir: Path) -> str:
 
 def main() -> None:
     args = parse_args()
-    export_dir = resolve_export_dir(args)
+    ensure_model_dir(args.model_dir)
 
-    if args.force_export or not has_exported_model(export_dir):
-        print(f"[1/3] Exporting {args.model_id} to OpenVINO: {export_dir}")
-        run_export(args.model_id, export_dir, args.weight_format)
-    else:
-        print(f"[1/3] Reusing exported model: {export_dir}")
+    print(f"[1/2] Loading OpenVINO model: {args.model_dir}")
+    result = generate_text(args)
 
-    print(f"[2/3] Running inference on {args.device}")
-    result = generate_text(args, export_dir)
-
-    print("[3/3] Response")
+    print(f"[2/2] Response from {args.device}")
     print(result.strip())
 
 

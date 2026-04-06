@@ -1,6 +1,6 @@
 # Gemma 4 OpenVINO Demo
 
-`google/gemma-4-E4B-it` を OpenVINO IR に変換して推論する Python デモです。
+`google/gemma-4-E4B-it` を OpenVINO IR に変換してから推論する Python デモです。
 実装の流れは OpenVINO Notebook の Gemma 4 サンプルを参考にしています。
 
 参照:
@@ -12,10 +12,15 @@
 事前に Hugging Face 側で Gemma の利用許諾に同意し、必要に応じてログインしてください。
 
 ```bash
-pip install git+https://github.com/rkazants/optimum-intel.git@support_gemma_4
-pip install --pre -U openvino openvino-tokenizers nncf --extra-index-url https://storage.openvinotoolkit.org/simple/wheels/nightly
-pip install transformers==5.5.0
 pip install -r requirements.txt
+```
+
+## モデル変換
+
+推論前に OpenVINO IR へ変換します。
+
+```bash
+optimum-cli export openvino --model google/gemma-4-E4B-it --task image-text-to-text --trust-remote-code --weight-format int8 gemma-4-E4B-it_ov_int8
 ```
 
 ## 実行
@@ -31,14 +36,15 @@ python gemma4_demo.py --system-prompt "You are a concise technical assistant." -
 python gemma4_demo.py --image https://raw.githubusercontent.com/google-gemma/cookbook/refs/heads/main/Demos/sample-data/GoldenGate.png --prompt "この画像を説明して"
 ```
 
-初回実行時は `optimum-cli export openvino` でモデルを `models/gemma-4-E4B-it/INT8` に変換します。
-2回目以降は変換済みモデルを再利用します。
+デフォルトでは `gemma-4-E4B-it_ov_int8` から変換済みモデルを読み込みます。
+別の場所に変換した場合は `--model-dir` で指定してください。
+
+```bash
+python gemma4_demo.py --model-dir path/to/exported_model
+```
 
 ## オプション
 
 ```bash
 python gemma4_demo.py --help
 ```
-
-`requirements.txt` は補助パッケージだけを入れます。
-`optimum-intel` / `openvino` / `transformers` は依存解決順の都合で README の順番どおりに個別インストールしてください。
