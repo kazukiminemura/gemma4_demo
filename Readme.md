@@ -13,8 +13,7 @@ Gemma 4 系モデルを OpenVINO IR に変換してから推論する Python デ
 事前に Hugging Face 側で Gemma の利用許諾に同意し、必要に応じてログインしてください。
 
 ```bash
-uv venv
-uv pip install -r requirements.txt
+uv sync
 ```
 
 ## モデル変換
