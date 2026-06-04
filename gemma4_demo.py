@@ -1,8 +1,11 @@
 """
-Gemma 4 E4B OpenVINO inference demo.
+Gemma 4 OpenVINO inference demo.
 
 Before running this script, export the model with:
-optimum-cli export openvino --model google/gemma-4-E4B-it --task image-text-to-text --trust-remote-code --weight-format int8 gemma-4-E4B-it_ov_int8
+uv run optimum-cli export openvino --model google/gemma-4-E4B-it --task image-text-to-text --trust-remote-code --weight-format int8 gemma-4-E4B-it_ov_int8
+
+For the 12B assistant model:
+uv run optimum-cli export openvino --model google/gemma-4-12B-it-assistant --task image-text-to-text --trust-remote-code --weight-format int8 gemma-4-12B-it-assistant_ov_int8
 """
 
 from __future__ import annotations
@@ -11,19 +14,36 @@ import argparse
 from io import BytesIO
 from pathlib import Path
 
-DEFAULT_MODEL_DIR = Path("gemma-4-E4B-it_ov_int8")
+MODEL_CONFIGS = {
+    "google/gemma-4-E4B-it": Path("gemma-4-E4B-it_ov_int8"),
+    "google/gemma-4-12B-it-assistant": Path("gemma-4-12B-it-assistant_ov_int8"),
+}
+DEFAULT_MODEL_ID = "google/gemma-4-E4B-it"
 DEFAULT_DEVICE = "AUTO"
+
+
+def export_command(model_id: str, model_dir: Path) -> str:
+    return (
+        f"uv run optimum-cli export openvino --model {model_id} "
+        "--task image-text-to-text --trust-remote-code --weight-format int8 "
+        f"{model_dir}"
+    )
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run inference with a pre-exported google/gemma-4-E4B-it OpenVINO model."
+        description="Run inference with a pre-exported Gemma 4 OpenVINO model."
+    )
+    parser.add_argument(
+        "--model-id",
+        choices=sorted(MODEL_CONFIGS),
+        default=DEFAULT_MODEL_ID,
+        help=f"Gemma model to use. Default: {DEFAULT_MODEL_ID}",
     )
     parser.add_argument(
         "--model-dir",
         type=Path,
-        default=DEFAULT_MODEL_DIR,
-        help=f"Directory containing the exported OpenVINO model. Default: {DEFAULT_MODEL_DIR}",
+        help="Directory containing the exported OpenVINO model. Default depends on --model-id.",
     )
     parser.add_argument(
         "--prompt",
@@ -55,18 +75,19 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Enable Gemma 4 thinking mode.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.model_dir is None:
+        args.model_dir = MODEL_CONFIGS[args.model_id]
+    return args
 
 
-def ensure_model_dir(model_dir: Path) -> None:
+def ensure_model_dir(model_id: str, model_dir: Path) -> None:
     if model_dir.exists() and any(model_dir.glob("*.xml")):
         return
 
     raise SystemExit(
         "OpenVINO model files were not found. Export the model first:\n"
-        "optimum-cli export openvino --model google/gemma-4-E4B-it "
-        "--task image-text-to-text --trust-remote-code --weight-format int8 "
-        "gemma-4-E4B-it_ov_int8"
+        f"{export_command(model_id, model_dir)}"
     )
 
 
@@ -152,9 +173,9 @@ def generate_text(args: argparse.Namespace) -> str:
 
 def main() -> None:
     args = parse_args()
-    ensure_model_dir(args.model_dir)
+    ensure_model_dir(args.model_id, args.model_dir)
 
-    print(f"[1/2] Loading OpenVINO model: {args.model_dir}")
+    print(f"[1/2] Loading OpenVINO model: {args.model_id} from {args.model_dir}")
     result = generate_text(args)
 
     print(f"[2/2] Response from {args.device}")
