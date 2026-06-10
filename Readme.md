@@ -1,6 +1,7 @@
 # Gemma 4 OpenVINO Demo
 
 Gemma 4 系モデルを OpenVINO IR に変換してから推論する Python デモです。
+CPU 側の Python 生成ループを避けるため、実行時は OpenVINO GenAI の `VLMPipeline` を使います。
 実装の流れは OpenVINO Notebook の Gemma 4 サンプルを参考にしています。
 
 参照:
@@ -35,14 +36,18 @@ uv run python export_gemma4.py
 # テキスト推論
 uv run python gemma4_demo.py
 
-# システムプロンプト指定
-uv run python gemma4_demo.py --system-prompt "You are a concise technical assistant." --prompt "OpenVINOの特徴を説明して"
+# プロンプト指定
+uv run python gemma4_demo.py --prompt "OpenVINOの特徴を説明して"
 
-# 画像付き推論
-uv run python gemma4_demo.py --image https://raw.githubusercontent.com/google-gemma/cookbook/refs/heads/main/Demos/sample-data/GoldenGate.png --prompt "この画像を説明して"
+# チャット
+uv run python gemma4_demo.py --chat
+
+# 最初の入力を渡してからチャット
+uv run python gemma4_demo.py --chat --prompt "OpenVINOの特徴を短く説明して"
 ```
 
-デフォルトの実行デバイスは `CPU` です。`--device AUTO` を指定した場合、このデモは `AUTO:GPU,CPU` に変換します。
+デフォルトの実行デバイスは `GPU` です。CPU で実行したい場合だけ `--device CPU` を指定してください。
+`--device AUTO` を指定した場合、このデモは `AUTO:GPU,CPU` に変換します。
 
 Intel NPU で実行する場合は、NPU 向けに INT4 symmetric のモデルを別途変換してください。
 
@@ -51,29 +56,19 @@ uv run python export_gemma4.py --npu
 uv run python gemma4_demo.py --device NPU --prompt "OpenVINOの特徴を短く説明して"
 ```
 
-`--device NPU` では Optimum の `generate()` ではなく OpenVINO GenAI の `VLMPipeline` を使います。
-NPU では greedy decoding のみを使うため、サンプリングは無効です。
+`gemma4_demo.py` は OpenVINO GenAI の `VLMPipeline` を使います。
+CPU 負荷を減らすため、チャット履歴は `pipe.start_chat()` に持たせ、Transformers/Optimum の `generate()` は使いません。
+ストリーミングと画像入力は含めていません。
+サンプリングは無効で、greedy decoding のみを使います。
 
-CLI でチャットする場合:
-
-```bash
-uv run python gemma4_demo.py --chat
-```
-
-最初の入力をコマンドラインで渡してからチャットを続けることもできます。
-
-```bash
-uv run python gemma4_demo.py --chat --prompt "OpenVINOの特徴を短く説明して"
-```
-
-チャットでは各応答の末尾に以下のようなメトリクスを表示します。
+推論時は以下のメトリクスを表示します。
 
 ```text
-[metrics] FTTP: 0.532s | output tokens: 128 | total: 8.421s | tokens/sec: 16.22
+[metrics] model_load: 12.326s | time_to_first_token: 0.592s | output_tokens: 4 | tokens/sec: 79.62
 ```
 
-`FTTP` は生成開始から最初の出力 token までの時間です。
-`tokens/sec` は最初の出力 token 以降の生成速度です。
+`model_load` は `VLMPipeline` のロード時間、`time_to_first_token` は `generate()` 開始から最初の出力までの時間です。
+`tokens/sec` は最初の出力以降の生成速度です。
 
 デフォルトでは `gemma-4-E4B-it_ov_int8` から変換済みモデルを読み込みます。
 別の場所に変換した場合は `--model-dir` で指定してください。
