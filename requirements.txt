@@ -4,8 +4,9 @@
 
 git+https://github.com/rkazants/optimum-intel.git@support_gemma4
 openvino
+openvino-genai
 nncf
-transformers==5.5.0
+git+https://github.com/huggingface/transformers.git@d3f05911abb216047a00aba79c8543c73633db05
 torch>=2.10
 torchvision
 Pillow

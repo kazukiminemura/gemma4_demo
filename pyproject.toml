@@ -7,7 +7,7 @@ dependencies = [
     "optimum-intel",
     "openvino",
     "nncf",
-    "transformers==5.5.0",
+    "transformers",
     "torch>=2.10",
     "torchvision",
     "Pillow",
@@ -15,6 +15,7 @@ dependencies = [
     "opencv-python",
     "requests",
     "matplotlib",
+    "openvino-genai>=2026.2.0.0",
 ]
 
 [tool.uv]
@@ -22,16 +23,23 @@ package = false
 prerelease = "allow"
 index-strategy = "unsafe-best-match"
 override-dependencies = [
-    "transformers==5.5.0",
+    "transformers @ git+https://github.com/huggingface/transformers.git@d3f05911abb216047a00aba79c8543c73633db05",
 ]
 
 [tool.uv.sources]
 optimum-intel = { git = "https://github.com/rkazants/optimum-intel.git", branch = "support_gemma4" }
+transformers = { git = "https://github.com/huggingface/transformers.git", rev = "d3f05911abb216047a00aba79c8543c73633db05" }
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
+openvino = { index = "openvino-nightly" }
+openvino-tokenizers = { index = "openvino-nightly" }
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [[tool.uv.index]]
 name = "openvino-nightly"
 url = "https://storage.openvinotoolkit.org/simple/wheels/nightly"
+explicit = true

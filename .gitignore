@@ -3,4 +3,4 @@ __pycache__/
 venv/
 models/
 gemma-4-E4B-it_ov_int8/
-gemma-4-12B-it-assistant_ov_int8/
+gemma-4-E4B-it_ov_int4_npu/
