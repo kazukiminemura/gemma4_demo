@@ -9,6 +9,7 @@ nncf
 git+https://github.com/huggingface/transformers.git@d3f05911abb216047a00aba79c8543c73633db05
 torch>=2.10
 torchvision
+accelerate
 Pillow
 gradio>=6.0
 opencv-python
