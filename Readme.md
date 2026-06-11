@@ -3,7 +3,8 @@
 Gemma 系モデルをローカル推論する Python デモです。
 OpenVINO 対応モデルは OpenVINO IR に変換し、実行時は OpenVINO GenAI の `VLMPipeline` を使います。
 実装の流れは OpenVINO Notebook の Gemma 4 サンプルを参考にしています。
-`google/gemma-3-12b-it` と `google/gemma-4-12B-it` は Transformers backend で実行します。
+`google/gemma-3-12b-it` と `google/gemma-4-E4B-it` は OpenVINO export に対応しています。
+`google/gemma-4-12B-it` は OpenVINO exporter が未対応のため、Transformers backend で実行します。
 
 参照:
 - https://github.com/openvinotoolkit/openvino_notebooks/blob/latest/notebooks/gemma4/gemma4.ipynb
@@ -22,16 +23,19 @@ uv sync
 
 ## モデル変換
 
-推論前に OpenVINO IR へ変換します。デフォルトでは `google/gemma-4-E4B-it` を使います。
+OpenVINO backend で推論する場合は、事前に OpenVINO IR へ変換します。デフォルトでは `google/gemma-4-E4B-it` を使います。
 
 ```bash
 uv run python export_gemma4.py
+
+# Gemma 3 12B を変換
+uv run python export_gemma4.py --model-id google/gemma-3-12b-it
 ```
 
 現時点の `optimum-intel` OpenVINO exporter は `google/gemma-4-12B-it` の `gemma4_unified` と
 `google/gemma-4-12B-it-assistant` の `gemma4_unified_assistant` には未対応です。
 12B assistant は 12B 本体の speculative decoding 用 drafter なので、OpenVINO IR へ変換する対象にはできません。
-`google/gemma-3-12b-it` と `google/gemma-4-12B-it` を使う場合は、変換せずに Transformers backend で実行してください。
+`google/gemma-4-12B-it` を使う場合は、変換せずに Transformers backend で実行してください。
 
 ## 実行
 
@@ -39,8 +43,11 @@ uv run python export_gemma4.py
 # テキスト推論
 uv run python gemma4_demo.py
 
-# Gemma 3 12B テキスト推論（Transformers backend）
+# Gemma 3 12B テキスト推論（OpenVINO backend。事前変換済みの場合）
 uv run python gemma4_demo.py --model-id google/gemma-3-12b-it --prompt "ローカルLLMの特徴を説明して"
+
+# Gemma 3 12B テキスト推論（Transformers backend）
+uv run python gemma4_demo.py --model-id google/gemma-3-12b-it --backend transformers --prompt "ローカルLLMの特徴を説明して"
 
 # Gemma 4 12B テキスト推論（Transformers backend）
 uv run python gemma4_demo.py --model-id google/gemma-4-12B-it --prompt "OpenVINOの特徴を説明して"

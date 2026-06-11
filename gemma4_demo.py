@@ -18,6 +18,7 @@ os.environ.setdefault("DNNL_VERBOSE", "0")
 os.environ.setdefault("OV_LOG_LEVEL", "ERROR")
 
 MODEL_CONFIGS = {
+    "google/gemma-3-12b-it": Path("gemma-3-12b-it_ov_int8"),
     "google/gemma-4-E4B-it": Path("gemma-4-E4B-it_ov_int8"),
 }
 NPU_MODEL_CONFIGS = {

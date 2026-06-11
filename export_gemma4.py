@@ -1,5 +1,5 @@
 """
-Export a Gemma 4 model to OpenVINO IR.
+Export a Gemma model to OpenVINO IR.
 
 This wrapper always passes --library transformers to optimum-cli so the exporter
 does not try to infer the library by listing Hugging Face repository files first.
@@ -14,6 +14,7 @@ from pathlib import Path
 
 
 MODEL_CONFIGS = {
+    "google/gemma-3-12b-it": Path("gemma-3-12b-it_ov_int8"),
     "google/gemma-4-E4B-it": Path("gemma-4-E4B-it_ov_int8"),
 }
 NPU_MODEL_CONFIGS = {
@@ -34,7 +35,7 @@ DEFAULT_MODEL_ID = "google/gemma-4-E4B-it"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Export a Gemma 4 model to OpenVINO IR.")
+    parser = argparse.ArgumentParser(description="Export a Gemma model to OpenVINO IR.")
     parser.add_argument(
         "--model-id",
         choices=sorted([*MODEL_CONFIGS, *UNSUPPORTED_MODEL_MESSAGES]),
@@ -69,11 +70,11 @@ def build_command(args: argparse.Namespace) -> list[str]:
     if args.model_id in UNSUPPORTED_MODEL_MESSAGES:
         raise SystemExit(
             f"{UNSUPPORTED_MODEL_MESSAGES[args.model_id]}\n"
-            "Use google/gemma-4-E4B-it for this OpenVINO demo, or run the 12B "
-            "models with Transformers until optimum-intel adds gemma4_unified export support."
+            "Use google/gemma-3-12b-it or google/gemma-4-E4B-it for OpenVINO export, "
+            "or run unsupported models with Transformers."
         )
 
-    output_dir = args.output_dir or (NPU_MODEL_CONFIGS[args.model_id] if args.npu else MODEL_CONFIGS[args.model_id])
+    output_dir = resolve_output_dir(args)
     weight_format = "int4" if args.npu and args.weight_format == "int8" else args.weight_format
     command = [
         sys.executable,
@@ -131,11 +132,11 @@ def export_with_openvino_api(args: argparse.Namespace) -> None:
     if args.model_id in UNSUPPORTED_MODEL_MESSAGES:
         raise SystemExit(
             f"{UNSUPPORTED_MODEL_MESSAGES[args.model_id]}\n"
-            "Use google/gemma-4-E4B-it for this OpenVINO demo, or run the 12B "
-            "models with Transformers until optimum-intel adds gemma4_unified export support."
+            "Use google/gemma-3-12b-it or google/gemma-4-E4B-it for OpenVINO export, "
+            "or run unsupported models with Transformers."
         )
 
-    output_dir = args.output_dir or (NPU_MODEL_CONFIGS[args.model_id] if args.npu else MODEL_CONFIGS[args.model_id])
+    output_dir = resolve_output_dir(args)
     weight_format = "int4" if args.npu and args.weight_format == "int8" else args.weight_format
 
     quantization_config = None
@@ -150,7 +151,8 @@ def export_with_openvino_api(args: argparse.Namespace) -> None:
             tokenizer=args.model_id,
         )
 
-    patch_gemma4_exporter()
+    if args.model_id.startswith("google/gemma-4-"):
+        patch_gemma4_exporter()
     main_export(
         model_name_or_path=args.model_id,
         output=output_dir,
@@ -163,6 +165,17 @@ def export_with_openvino_api(args: argparse.Namespace) -> None:
         convert_tokenizer=True,
         library_name="transformers",
     )
+
+
+def resolve_output_dir(args: argparse.Namespace) -> Path:
+    if args.npu:
+        if args.model_id in NPU_MODEL_CONFIGS:
+            return args.output_dir or NPU_MODEL_CONFIGS[args.model_id]
+        raise SystemExit(
+            f"{args.model_id} does not have an NPU export profile in this demo. "
+            "Run without --npu, or use google/gemma-4-E4B-it with --npu."
+        )
+    return args.output_dir or MODEL_CONFIGS[args.model_id]
 
 
 def main() -> None:
